@@ -23,9 +23,6 @@ def MASS_train(model, index, domain_num, optimizer, scheduler, iteration, device
     acc = []
     time_all = []
     for i in range(1, iteration + 1):
-        print('Epoch: {}'.format(index))
-        for param_group in optimizer.param_groups:
-            print(param_group['lr'])
         model.train()
         for idx in range(len(source_loader)):
             try:
@@ -48,11 +45,11 @@ def MASS_train(model, index, domain_num, optimizer, scheduler, iteration, device
             target_data = Variable(target_data)
             optimizer.zero_grad()
             t0 = time.time()
-            cls_1, cls_loss, src_loss, trt_loss, l1_loss = model(source_data, target_data, source_label.long(), mark=idx)
-            alpha = 1
-            beta = (2 / (1 + math.exp(-10 * (i) / (iteration))) - 1)/2
+            alpha = 2 / (1 + math.exp(-10 * (i) / (iteration))) - 1
+            beta = 0.5
             lamuda = 1
-            loss = cls_1 + alpha*cls_loss + beta * (src_loss + trt_loss) + lamuda*l1_loss
+            cls_1, cls_loss, src_loss, trt_loss, l1_loss = model(source_data, target_data, source_label.long(), mark=idx,alpha = alpha)
+            loss = cls_1 + alpha * (src_loss + trt_loss) + beta*l1_loss + lamuda*cls_loss
             loss.backward()
             optimizer.step()
 
@@ -79,6 +76,11 @@ def MASS_train(model, index, domain_num, optimizer, scheduler, iteration, device
     utils.visualize_accuracy(acc, 'acc', resultdir)
     utils.result_save(resultdir, acc, 'test_acc')
     utils.result_save(resultdir, time_all, 'time')
+    log_file = resultdir + '/log.txt'
+    logprint(log_file, 'alpha = ' + str(alpha))
+    logprint(log_file, 'beta = ' + str(beta))
+    logprint(log_file, 'lamuda = ' + str(lamuda))
+
 
 def valid(model,domain_num,device):
     model.eval()
@@ -116,11 +118,18 @@ def model_save(name,item,title):
     torch.save(item,f)
     print('Saved model:', f)
 
+def logprint(log_file, string):
+    file_writer = open(log_file, 'a')
+    file_writer.write('{:}\n'.format(string))
+    file_writer.flush()
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='MASS parameters')
     parser.add_argument('--batch_size', type=int, default=32, help='size for one batch, integer')
-    parser.add_argument('--iteration', type=int, default=2000, help='training epoch, integer')
+    parser.add_argument('--iteration', type=int, default=1000, help='training epoch, integer')
     parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
+    parser.add_argument('--step_size', type=float, default=500, help='step_size')
+    parser.add_argument('--gamma', type=float, default=0.5, help='drop of lr')
     parser.add_argument('--cuda', type=float, default=True, help='using CUDA or not')
     parser.add_argument('--seed', type=float, default=8, help='random seed')
     parser.add_argument('--log_interval', type=float, default=10, help='log_interval')
@@ -132,22 +141,28 @@ if __name__ == '__main__':
     data_path = '/home/ps/LYK/MyMSDA4/data/'
     dataloader = utils.Dataloader(data_path, human, args.batch_size)
     # data save path
-    date = '2022-3-28'
-    hourandmin = '0849'
+    date = '2022-3-30'
+    hourandmin = '2019'
     save_path = './result/' + date + '/' +hourandmin
     if os.path.exists(save_path) == False:
         os.makedirs(save_path)
-
+    # record para
+    log_file = save_path + '/log.txt'
+    logprint(log_file, 'train_bs = ' + str(args.batch_size))
+    logprint(log_file, 'num_epochs = ' + str(args.iteration))
+    logprint(log_file, 'learning rate = ' + str(args.lr))
+    logprint(log_file, 'step_size = ' + str(args.step_size))
+    logprint(log_file, 'gamma = ' + str(args.gamma))
     #leave-one-subject-out split
     for j in range(len(human)):
         net = models.MASS(num_classes=args.class_num,num_domains=args.domain_num)
         optimizer = torch.optim.Adam([{'params': net.parameters()}], lr=args.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.5)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
         if args.cuda:
             net.cuda()
         num = list(range(len(human)))
         num.pop(j)
-        target_train_loader, target_test_loader = dataloader[j], dataloader[j]
+        target_train_loader, target_test_loader = utils.Dataloader_targrt(data_path, human[j], args.batch_size,rate=0.5)
         source_loader = []
         for k in num:
             source_loader.append(dataloader[k])
