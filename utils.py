@@ -72,41 +72,6 @@ def Data(path='E:/Jupyter/CNN/cutout_new_data_48/', human=['CL'], emotion=['angr
     return sequences, label_ges, label_emo
 
 
-def train_test_split_dataloader(data,label,rate = 0.2,BATCH_SIZE = 32):
-    ss = StratifiedShuffleSplit(n_splits=1, test_size=rate, train_size=1-rate, random_state=0)  # 分成5组，测试比例为0.25，训练比例是0.75
-    for train_index, test_index in ss.split(data, label):
-        data_train, test_person_data = np.array(data)[train_index], np.array(data)[test_index]  # 训练集对应的值
-        lable_train, test_person_label = np.array(label)[train_index], np.array(label)[test_index]  # 类别集对应的值
-
-    lable_train = lable_train.reshape((len(lable_train),))
-    print(lable_train.shape)
-
-    trainX = torch.from_numpy(np.array(data_train))  # 将数组转化为张量，并且二者共享内存，trainX改变，Xtr也会改变
-    trainy = torch.from_numpy(np.array(lable_train))
-    print(trainX.shape)
-
-    testX = torch.from_numpy(np.array(test_person_data))
-    testy = torch.from_numpy(np.array(test_person_label))
-
-    train_dataset = torch.utils.data.TensorDataset(trainX, trainy)
-    test_dataset = torch.utils.data.TensorDataset(testX, testy)  # 把数据放在数据库中
-
-    # 打乱训练集数据索引，将索引划分为训练集索引和验证集索引
-    num_train = len(train_dataset)
-    indices = list(range(num_train))  # 数组，从1到num排列 [1,2,3,4...,6244]
-    np.random.shuffle(indices)  # 打乱indices顺序
-
-    # 创建训练集，验证集，测试集的数据loader，每次调用返回一个batch数据
-    train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True)  # ,
-    # sampler=train_sampler)
-    print('读取训练数据集合完成')
-    # valid_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size = BATCH_SIZE,
-    #                                            sampler=valid_sampler)
-    # print('读取验证数据集合完成')
-    test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
-    print('测试训练数据集合完成', testX.size())
-    return train_loader, test_loader
-
 def Dataloader(data_path = '/home/ps/LYK/MyMSDA4/data/',train_human= ['CL'],BATCH_SIZE = 32):
     data_loader = []
     for i in range(len(train_human)):
@@ -131,12 +96,44 @@ def Dataloader(data_path = '/home/ps/LYK/MyMSDA4/data/',train_human= ['CL'],BATC
         data_loader.append(loader)
     return data_loader
 
+def Dataloader_targrt(data_path = '/home/ps/LYK/MyMSDA4/data/',train_human= ['CL'],BATCH_SIZE = 32, rate = 0.5):
+    data, target, _ = Data(path=data_path,
+                         human=[train_human],
+                         emotion=['afraid', 'angry', 'astonished', 'calm', 'content', 'depress',
+                                  'disgust', 'excited', 'pleasure', 'relaxed', 'sad', 'tired',
+                                  'rest'])
+    data = np.squeeze(np.array(data), axis=0)
+    label = np.squeeze(target, axis=0)
+    ss = StratifiedShuffleSplit(n_splits=1, test_size=rate, train_size=1 - rate,
+                                random_state=0)
+    for train_index, test_index in ss.split(data, label):
+        # print("TRAIN:", train_index, "TEST:", test_index)  # 获得索引值
+        data_train, test_person_data = np.array(data)[train_index], np.array(data)[test_index]  # 训练集对应的值
+        lable_train, test_person_label = np.array(label)[train_index], np.array(label)[test_index]  # 类别集对应的值
 
 
-def step_lr(optimizer, learning_rate, epoch, gamma):
-    lr = learning_rate
-    if (epoch % 10==0) :#&(epoch ==200):
-        lr = learning_rate * gamma
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-    return lr
+    lable_train = lable_train.reshape((len(lable_train),))
+    print(lable_train.shape)
+
+    BATCH_SIZE = BATCH_SIZE
+
+    trainX = torch.from_numpy(np.array(data_train))  # 将数组转化为张量，并且二者共享内存，trainX改变，Xtr也会改变
+    trainy = torch.from_numpy(np.array(lable_train))
+    print(trainX.shape)
+
+    testX = torch.from_numpy(np.array(test_person_data))
+    testy = torch.from_numpy(np.array(test_person_label))
+
+    train_dataset = torch.utils.data.TensorDataset(trainX, trainy)
+    test_dataset = torch.utils.data.TensorDataset(testX, testy)  # 把数据放在数据库中
+
+    # 创建训练集，验证集，测试集的数据loader，每次调用返回一个batch数据
+    train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True)  # ,
+    # sampler=train_sampler)
+    print('目标域训练数据集合完成')
+    # valid_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size = BATCH_SIZE,
+    #                                            sampler=valid_sampler)
+    # print('读取验证数据集合完成')
+    test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
+    print('目标域测试数据集合完成', testX.size())
+    return train_loader, test_loader
