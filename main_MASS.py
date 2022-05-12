@@ -107,7 +107,7 @@ def valid(model,domain_num,device):
             correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
         test_loss /= len(target_test_loader.dataset)
-        print('DX', '\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+        print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
             test_loss, correct, len(target_test_loader.dataset),
             100. * correct / len(target_test_loader.dataset)))
         print('\nsource accnum {}'.format(correct_per))
